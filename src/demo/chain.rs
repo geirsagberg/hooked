@@ -5,6 +5,14 @@ use bevy::{prelude::*, window::PrimaryWindow};
 
 use crate::{AppSystems, PausableSystems, demo::player::Player, screens::Screen};
 
+/// Collision layers for physics objects
+#[derive(PhysicsLayer, Default)]
+pub enum Layer {
+    #[default]
+    ChainLink,
+    StaticObstacle,
+}
+
 pub(super) fn plugin(app: &mut App) {
     app.register_type::<ChainLink>();
     app.register_type::<ChainRoot>();
@@ -91,7 +99,7 @@ fn spawn_chain(
 ) {
     let chain_direction = (target_pos - start_pos).normalize();
     let chain_length = (target_pos - start_pos).length();
-    let link_size = 20.0; // 20 pixels per link
+    let link_size = 15.0; // Smaller links for better collision handling
     let num_links = (chain_length / link_size).max(1.0) as usize;
 
     let mut previous_entity = None;
@@ -106,17 +114,22 @@ fn spawn_chain(
             ChainLink { link_index: i },
             // Physics components
             RigidBody::Dynamic,
-            Collider::circle(8.0), // Slightly larger collider for better collision
-            Mass(0.5),             // Increased mass for better stability when resting
-            LinearDamping(0.1),    // Air resistance/drag
-            AngularDamping(0.2),   // Rotational damping
-            SweptCcd::default(),   // Continuous Collision Detection to prevent tunneling
-            Restitution::new(0.3), // Some bounciness for better collision response
-            Friction::new(0.5),    // Friction for more realistic interactions
-            // Visual components (simple white circle for now)
+            Collider::circle(10.0), // Slightly smaller collider for better physics
+            Mass(2.0),              // Increased mass for better stability
+            LinearDamping(0.2),     // More air resistance for stability
+            AngularDamping(0.3),    // More rotational damping
+            SweptCcd::default(),    // Continuous Collision Detection to prevent tunneling
+            Restitution::new(0.1),  // Less bounciness for smoother collisions
+            Friction::new(0.7),     // Higher friction for better interaction with obstacles
+            // Collision groups to ensure proper detection
+            CollisionLayers::new(
+                [Layer::ChainLink],
+                [Layer::ChainLink, Layer::StaticObstacle],
+            ),
+            // Visual components (keep small visual representation)
             Sprite {
                 color: Color::WHITE,
-                custom_size: Some(Vec2::splat(10.0)),
+                custom_size: Some(Vec2::splat(8.0)), // Smaller visual than collider
                 ..default()
             },
             Transform::from_translation(link_pos.extend(0.0)),
@@ -139,7 +152,7 @@ fn spawn_chain(
                     .with_local_anchor_1(Vec2::ZERO)
                     .with_local_anchor_2(Vec2::ZERO)
                     .with_rest_length(link_size)
-                    .with_compliance(0.001), // Add compliance to make joints less rigid
+                    .with_compliance(0.00001), // Even softer constraint for better chain behavior
             ));
         }
 
@@ -148,7 +161,7 @@ fn spawn_chain(
 
     // Give the chain an initial impulse towards the target
     if let Some(&first_link) = chain_state.links.first() {
-        let impulse_strength = 400.0; // Moderate impulse strength
+        let impulse_strength = 200.0; // Reduced impulse strength for better collision handling
         let impulse = chain_direction * impulse_strength;
 
         commands

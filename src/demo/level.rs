@@ -6,6 +6,7 @@ use bevy::prelude::*;
 use crate::{
     asset_tracking::LoadResource,
     audio::music,
+    demo::chain::Layer,
     demo::player::{PlayerAssets, player},
     screens::Screen,
 };
@@ -54,6 +55,9 @@ pub fn spawn_level(
 
     // Spawn static boxes for chain interaction
     spawn_static_boxes(&mut commands);
+
+    // Spawn a dynamic test box to verify physics
+    spawn_dynamic_test_box(&mut commands);
 }
 
 /// Spawns static boxes around the level that chains can interact with
@@ -73,9 +77,11 @@ fn spawn_static_boxes(commands: &mut Commands) {
             // Physics components
             RigidBody::Static,               // Static means it won't move
             Collider::rectangle(40.0, 40.0), // 40x40 pixel box
-            Restitution::new(0.2),           // Slight bounciness
-            Friction::new(0.7),              // Good friction for chain interaction
-            // Visual components
+            Restitution::new(0.1),           // Low restitution for less bouncy collisions
+            Friction::new(0.9),              // Very high friction for better chain interaction
+            // Collision groups
+            CollisionLayers::new([Layer::StaticObstacle], [Layer::ChainLink]),
+            // Visual componentsd
             Sprite {
                 color: Color::srgb(0.8, 0.8, 0.8), // Light gray color
                 custom_size: Some(Vec2::splat(40.0)),
@@ -86,4 +92,30 @@ fn spawn_static_boxes(commands: &mut Commands) {
             StateScoped(Screen::Gameplay), // Clean up when leaving gameplay
         ));
     }
+}
+
+/// Spawns a dynamic box to test physics behavior
+fn spawn_dynamic_test_box(commands: &mut Commands) {
+    commands.spawn((
+        Name::new("Dynamic Test Box"),
+        // Physics components - similar to chain links but as a box
+        RigidBody::Dynamic,
+        Collider::rectangle(30.0, 30.0), // 30x30 pixel box
+        Mass(0.5),                       // Same mass as chain links
+        LinearDamping(0.1),
+        AngularDamping(0.2),
+        SweptCcd::default(), // Same CCD as chain links
+        Restitution::new(0.3),
+        Friction::new(0.5),
+        // Visual components
+        Sprite {
+            color: Color::srgb(1.0, 0.5, 0.5), // Light red color to distinguish from static boxes
+            custom_size: Some(Vec2::splat(30.0)),
+            ..default()
+        },
+        // Position it above the first static box
+        Transform::from_translation(Vec3::new(200.0, 200.0, 0.0)), // Above static box at (200, 100)
+        Visibility::default(),
+        StateScoped(Screen::Gameplay),
+    ));
 }

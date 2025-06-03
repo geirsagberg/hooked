@@ -12,7 +12,7 @@ mod menus;
 mod screens;
 mod theme;
 
-use avian2d::prelude::*;
+use avian2d::{dynamics::solver::SolverConfig, prelude::*};
 use bevy::{asset::AssetMetaCheck, prelude::*};
 
 fn main() -> AppExit {
@@ -44,11 +44,24 @@ impl Plugin for AppPlugin {
                 }),
         );
 
-        // Add Avian physics plugin
-        app.add_plugins(PhysicsPlugins::default());
+        // Add Avian physics plugin with pixel-based length unit
+        app.add_plugins(PhysicsPlugins::default().with_length_unit(100.0)); // 100 pixels = 1 meter
 
         // Configure gravity
         app.insert_resource(Gravity(Vec2::NEG_Y * 980.0)); // Standard gravity (9.8 m/s² * 100 pixels/meter)
+
+        // Configure physics solver for better constraint handling and prevent tunneling
+        app.insert_resource(SolverConfig {
+            contact_damping_ratio: 25.0, // Higher damping makes contacts stiffer/less springy
+            contact_frequency_factor: 2.0, // Higher frequency for faster, more responsive contacts
+            max_overlap_solve_speed: 8.0, // Faster overlap resolution to prevent penetration
+            restitution_threshold: 0.5,  // Lower threshold for more responsive bouncing
+            restitution_iterations: 2,   // More iterations for better multi-contact restitution
+            ..default()
+        });
+
+        // Increase physics substeps for better collision resolution
+        app.insert_resource(SubstepCount(8)); // More substeps = better collision detection
 
         // Add other plugins.
         app.add_plugins((
