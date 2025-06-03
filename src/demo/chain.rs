@@ -99,40 +99,45 @@ fn spawn_chain(
 ) {
     let chain_direction = (target_pos - start_pos).normalize();
     let chain_length = (target_pos - start_pos).length();
-    let link_size = 20.0; // Smaller links for better collision handling
-    let num_links = (chain_length / link_size).max(1.0) as usize;
+    let link_size = 20.0; // Base link size for physics
+    let capsule_half_length = link_size * 0.4; // Half-length of each capsule
+    let actual_link_spacing = capsule_half_length * 2.0; // Actual distance between link centers
+    let num_links = (chain_length / actual_link_spacing).max(1.0) as usize;
 
     let mut previous_entity = None;
     chain_state.links.clear();
-
     for i in 0..num_links {
         let link_progress = i as f32 / num_links.max(1) as f32;
-        let link_pos = start_pos + chain_direction * link_progress * chain_length;
+        let link_pos = start_pos
+            + chain_direction * link_progress * (actual_link_spacing * (num_links - 1) as f32);
+
+        // Calculate rotation to align capsule with chain direction
+        let link_rotation = Quat::from_rotation_z(chain_direction.y.atan2(chain_direction.x));
 
         let mut entity_commands = commands.spawn((
             Name::new(format!("Chain Link {}", i)),
             ChainLink { link_index: i },
             // Physics components
             RigidBody::Dynamic,
-            Collider::circle(8.0), // Slightly smaller collider for better physics
-            Mass(2.0),             // Increased mass for better stability
-            LinearDamping(0.2),    // More air resistance for stability
-            AngularDamping(0.3),   // More rotational damping
-            SweptCcd::default(),   // Continuous Collision Detection to prevent tunneling
+            Collider::capsule(capsule_half_length, 2.0), // Length, radius - elongated capsule
+            Mass(2.0),                                   // Increased mass for better stability
+            LinearDamping(0.2),                          // More air resistance for stability
+            AngularDamping(0.3),                         // More rotational damping
+            SweptCcd::default(), // Continuous Collision Detection to prevent tunneling
             Restitution::new(0.1), // Less bounciness for smoother collisions
-            Friction::new(0.7),    // Higher friction for better interaction with obstacles
+            Friction::new(0.7),  // Higher friction for better interaction with obstacles
             // Collision groups to ensure proper detection
             CollisionLayers::new(
                 [Layer::ChainLink],
                 [Layer::ChainLink, Layer::StaticObstacle],
             ),
-            // Visual components (keep small visual representation)
+            // Visual components - elongated rectangle to match physics
             Sprite {
                 color: Color::WHITE,
-                custom_size: Some(Vec2::splat(8.0)), // Smaller visual than collider
+                custom_size: Some(Vec2::new(link_size * 0.8, 4.0)), // Match capsule dimensions
                 ..default()
             },
-            Transform::from_translation(link_pos.extend(0.0)),
+            Transform::from_translation(link_pos.extend(0.0)).with_rotation(link_rotation),
             Visibility::default(),
         ));
 
@@ -142,17 +147,15 @@ fn spawn_chain(
         }
 
         let current_entity = entity_commands.id();
-        chain_state.links.push(current_entity);
-
-        // Create joint to previous link or player
+        chain_state.links.push(current_entity); // Create joint to previous link or player
         if let Some(prev_entity) = previous_entity {
             commands.spawn((
                 Name::new(format!("Chain Joint {}-{}", i - 1, i)),
-                DistanceJoint::new(prev_entity, current_entity)
-                    .with_local_anchor_1(Vec2::ZERO)
-                    .with_local_anchor_2(Vec2::ZERO)
-                    .with_rest_length(link_size)
-                    .with_compliance(0.00001), // Even softer constraint for better chain behavior
+                RevoluteJoint::new(prev_entity, current_entity)
+                    .with_local_anchor_1(Vec2::new(capsule_half_length, 0.0)) // Right end of previous link
+                    .with_local_anchor_2(Vec2::new(-capsule_half_length, 0.0)) // Left end of current link
+                    .with_compliance(0.00001) // Soft constraint for natural movement
+                    .with_angular_velocity_damping(0.1), // Add some rotational damping
             ));
         }
 
