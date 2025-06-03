@@ -3,11 +3,7 @@
 use avian2d::prelude::*;
 use bevy::{prelude::*, window::PrimaryWindow};
 
-use crate::{
-    demo::player::Player,
-    screens::Screen,
-    AppSystems, PausableSystems,
-};
+use crate::{AppSystems, PausableSystems, demo::player::Player, screens::Screen};
 
 pub(super) fn plugin(app: &mut App) {
     app.register_type::<ChainLink>();
@@ -60,7 +56,7 @@ fn handle_chain_input(
             chain_state.active = false;
         } else {
             // Create new chain
-            if let Ok(player_transform) = player_query.get_single() {
+            if let Ok(player_transform) = player_query.single() {
                 if let Some(cursor_world_pos) = get_cursor_world_position(&windows, &camera_query) {
                     spawn_chain(
                         &mut commands,
@@ -78,11 +74,13 @@ fn get_cursor_world_position(
     windows: &Query<&Window, With<PrimaryWindow>>,
     camera_query: &Query<(&Camera, &GlobalTransform)>,
 ) -> Option<Vec2> {
-    let window = windows.get_single().ok()?;
+    let window = windows.single().ok()?;
     let cursor_pos = window.cursor_position()?;
-    let (camera, camera_transform) = camera_query.get_single().ok()?;
-    
-    camera.viewport_to_world_2d(camera_transform, cursor_pos).ok()
+    let (camera, camera_transform) = camera_query.single().ok()?;
+
+    camera
+        .viewport_to_world_2d(camera_transform, cursor_pos)
+        .ok()
 }
 
 fn spawn_chain(
