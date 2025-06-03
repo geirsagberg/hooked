@@ -99,7 +99,7 @@ fn spawn_chain(
 ) {
     let chain_direction = (target_pos - start_pos).normalize();
     let chain_length = (target_pos - start_pos).length();
-    let link_size = 15.0; // Smaller links for better collision handling
+    let link_size = 20.0; // Smaller links for better collision handling
     let num_links = (chain_length / link_size).max(1.0) as usize;
 
     let mut previous_entity = None;
@@ -114,13 +114,13 @@ fn spawn_chain(
             ChainLink { link_index: i },
             // Physics components
             RigidBody::Dynamic,
-            Collider::circle(10.0), // Slightly smaller collider for better physics
-            Mass(2.0),              // Increased mass for better stability
-            LinearDamping(0.2),     // More air resistance for stability
-            AngularDamping(0.3),    // More rotational damping
-            SweptCcd::default(),    // Continuous Collision Detection to prevent tunneling
-            Restitution::new(0.1),  // Less bounciness for smoother collisions
-            Friction::new(0.7),     // Higher friction for better interaction with obstacles
+            Collider::circle(8.0), // Slightly smaller collider for better physics
+            Mass(2.0),             // Increased mass for better stability
+            LinearDamping(0.2),    // More air resistance for stability
+            AngularDamping(0.3),   // More rotational damping
+            SweptCcd::default(),   // Continuous Collision Detection to prevent tunneling
+            Restitution::new(0.1), // Less bounciness for smoother collisions
+            Friction::new(0.7),    // Higher friction for better interaction with obstacles
             // Collision groups to ensure proper detection
             CollisionLayers::new(
                 [Layer::ChainLink],
