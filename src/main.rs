@@ -47,6 +47,9 @@ impl Plugin for AppPlugin {
         // Add Avian physics plugin
         app.add_plugins(PhysicsPlugins::default());
 
+        // Configure gravity
+        app.insert_resource(Gravity(Vec2::NEG_Y * 980.0)); // Standard gravity (9.8 m/s² * 100 pixels/meter)
+
         // Add other plugins.
         app.add_plugins((
             asset_tracking::plugin,

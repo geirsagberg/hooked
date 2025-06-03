@@ -47,24 +47,24 @@ fn handle_chain_input(
     camera_query: Query<(&Camera, &GlobalTransform)>,
 ) {
     if mouse_input.just_pressed(MouseButton::Left) {
+        // Remove existing chain if one exists
         if chain_state.active {
-            // Remove existing chain
             for entity in &chain_state.links {
                 commands.entity(*entity).despawn();
             }
             chain_state.links.clear();
             chain_state.active = false;
-        } else {
-            // Create new chain
-            if let Ok(player_transform) = player_query.single() {
-                if let Some(cursor_world_pos) = get_cursor_world_position(&windows, &camera_query) {
-                    spawn_chain(
-                        &mut commands,
-                        &mut chain_state,
-                        player_transform.translation.truncate(),
-                        cursor_world_pos,
-                    );
-                }
+        }
+
+        // Always create new chain
+        if let Ok(player_transform) = player_query.single() {
+            if let Some(cursor_world_pos) = get_cursor_world_position(&windows, &camera_query) {
+                spawn_chain(
+                    &mut commands,
+                    &mut chain_state,
+                    player_transform.translation.truncate(),
+                    cursor_world_pos,
+                );
             }
         }
     }
@@ -108,6 +108,8 @@ fn spawn_chain(
             RigidBody::Dynamic,
             Collider::circle(5.0), // Small collider for the link
             Mass(0.1),             // Light mass
+            LinearDamping(0.1),    // Air resistance/drag
+            AngularDamping(0.2),   // Rotational damping
             // Visual components (simple white circle for now)
             Sprite {
                 color: Color::WHITE,
