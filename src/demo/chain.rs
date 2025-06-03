@@ -102,9 +102,12 @@ fn handle_chain_input(
                             * link_progress
                             * (actual_link_spacing * (num_links - 1) as f32);
 
-                    // Calculate rotation to align capsule with chain direction
-                    let link_rotation =
-                        Quat::from_rotation_z(chain_direction.y.atan2(chain_direction.x));
+                    // Calculate rotation to align with chain direction
+                    // Capsules are Y-axis oriented by default, sprites are X-axis oriented
+                    // We need to rotate the entire entity so the capsule aligns with the chain direction
+                    let chain_angle = chain_direction.y.atan2(chain_direction.x);
+                    let entity_rotation =
+                        Quat::from_rotation_z(chain_angle - std::f32::consts::PI / 2.0);
 
                     let mut entity_commands = commands.spawn((
                         Name::new(format!("Chain Link {}", i)),
@@ -123,14 +126,14 @@ fn handle_chain_input(
                             [Layer::ChainLink],
                             [Layer::ChainLink, Layer::StaticObstacle],
                         ),
-                        // Visual components - elongated rectangle to match physics
+                        // Visual components - need to swap width/height to match capsule orientation
                         Sprite {
                             color: Color::WHITE,
-                            custom_size: Some(Vec2::new(link_size * 0.9, 3.0)), // Thinner visual, smaller than collision radius
+                            custom_size: Some(Vec2::new(3.0, link_size * 0.9)), // Now height is the long dimension
                             ..default()
                         },
                         Transform::from_translation(link_pos.extend(0.0))
-                            .with_rotation(link_rotation),
+                            .with_rotation(entity_rotation),
                         Visibility::default(),
                     ));
 
@@ -148,8 +151,8 @@ fn handle_chain_input(
                             .spawn((
                                 Name::new(format!("Chain Joint {}-{}", i - 1, i)),
                                 RevoluteJoint::new(prev_entity, current_entity)
-                                    .with_local_anchor_1(Vec2::new(capsule_half_length, 0.0)) // Right end of previous link
-                                    .with_local_anchor_2(Vec2::new(-capsule_half_length, 0.0)) // Left end of current link
+                                    .with_local_anchor_1(Vec2::new(0.0, capsule_half_length)) // Top end of previous link (capsule is now Y-oriented)
+                                    .with_local_anchor_2(Vec2::new(0.0, -capsule_half_length)) // Bottom end of current link
                                     .with_compliance(0.00001) // Soft constraint for natural movement
                                     .with_angular_velocity_damping(0.1), // Add some rotational damping
                             ))
