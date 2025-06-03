@@ -20,7 +20,7 @@ pub(super) fn plugin(app: &mut App) {
 
     app.add_systems(
         Update,
-        (handle_chain_input, update_chain_rendering)
+        (handle_chain_input)
             .in_set(AppSystems::Update)
             .in_set(PausableSystems)
             .run_if(in_state(Screen::Gameplay)),
@@ -100,7 +100,8 @@ fn spawn_chain(
     let chain_direction = (target_pos - start_pos).normalize();
     let chain_length = (target_pos - start_pos).length();
     let link_size = 20.0; // Base link size for physics
-    let capsule_half_length = link_size * 0.4; // Half-length of each capsule
+    let thickness = 5.0; // Thickness of the chain links
+    let capsule_half_length = link_size * 0.5; // Half-length of each capsule
     let actual_link_spacing = capsule_half_length * 2.0; // Actual distance between link centers
     let num_links = (chain_length / actual_link_spacing).max(1.0) as usize;
 
@@ -119,13 +120,13 @@ fn spawn_chain(
             ChainLink { link_index: i },
             // Physics components
             RigidBody::Dynamic,
-            Collider::capsule(capsule_half_length, 2.0), // Length, radius - elongated capsule
-            Mass(2.0),                                   // Increased mass for better stability
-            LinearDamping(0.2),                          // More air resistance for stability
-            AngularDamping(0.3),                         // More rotational damping
-            SweptCcd::default(), // Continuous Collision Detection to prevent tunneling
+            Collider::capsule(thickness / 2.0, link_size * 0.8), // Length, radius - smaller radius for tighter contact
+            Mass(2.0),             // Increased mass for better stability
+            LinearDamping(0.2),    // More air resistance for stability
+            AngularDamping(0.3),   // More rotational damping
+            SweptCcd::default(),   // Continuous Collision Detection to prevent tunneling
             Restitution::new(0.1), // Less bounciness for smoother collisions
-            Friction::new(0.7),  // Higher friction for better interaction with obstacles
+            Friction::new(0.7),    // Higher friction for better interaction with obstacles
             // Collision groups to ensure proper detection
             CollisionLayers::new(
                 [Layer::ChainLink],
@@ -134,7 +135,7 @@ fn spawn_chain(
             // Visual components - elongated rectangle to match physics
             Sprite {
                 color: Color::WHITE,
-                custom_size: Some(Vec2::new(link_size * 0.8, 4.0)), // Match capsule dimensions
+                custom_size: Some(Vec2::new(link_size * 0.9, 3.0)), // Thinner visual, smaller than collision radius
                 ..default()
             },
             Transform::from_translation(link_pos.extend(0.0)).with_rotation(link_rotation),
@@ -173,27 +174,4 @@ fn spawn_chain(
     }
 
     chain_state.active = true;
-}
-
-fn update_chain_rendering(
-    mut gizmos: Gizmos,
-    chain_links: Query<&Transform, With<ChainLink>>,
-    chain_state: Res<ChainState>,
-) {
-    if !chain_state.active || chain_state.links.len() < 2 {
-        return;
-    }
-
-    // Draw lines between consecutive links
-    for window in chain_state.links.windows(2) {
-        if let (Ok(transform1), Ok(transform2)) =
-            (chain_links.get(window[0]), chain_links.get(window[1]))
-        {
-            gizmos.line_2d(
-                transform1.translation.truncate(),
-                transform2.translation.truncate(),
-                Color::WHITE,
-            );
-        }
-    }
 }
