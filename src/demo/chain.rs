@@ -106,10 +106,13 @@ fn spawn_chain(
             ChainLink { link_index: i },
             // Physics components
             RigidBody::Dynamic,
-            Collider::circle(5.0), // Small collider for the link
-            Mass(0.1),             // Light mass
+            Collider::circle(8.0), // Slightly larger collider for better collision
+            Mass(0.5),             // Increased mass for better stability when resting
             LinearDamping(0.1),    // Air resistance/drag
             AngularDamping(0.2),   // Rotational damping
+            SweptCcd::default(),   // Continuous Collision Detection to prevent tunneling
+            Restitution::new(0.3), // Some bounciness for better collision response
+            Friction::new(0.5),    // Friction for more realistic interactions
             // Visual components (simple white circle for now)
             Sprite {
                 color: Color::WHITE,
@@ -135,7 +138,8 @@ fn spawn_chain(
                 DistanceJoint::new(prev_entity, current_entity)
                     .with_local_anchor_1(Vec2::ZERO)
                     .with_local_anchor_2(Vec2::ZERO)
-                    .with_rest_length(link_size),
+                    .with_rest_length(link_size)
+                    .with_compliance(0.001), // Add compliance to make joints less rigid
             ));
         }
 
@@ -144,7 +148,7 @@ fn spawn_chain(
 
     // Give the chain an initial impulse towards the target
     if let Some(&first_link) = chain_state.links.first() {
-        let impulse_strength = 500.0;
+        let impulse_strength = 400.0; // Moderate impulse strength
         let impulse = chain_direction * impulse_strength;
 
         commands
