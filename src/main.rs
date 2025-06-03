@@ -47,7 +47,7 @@ impl Plugin for AppPlugin {
         // Add Avian physics plugin with pixel-based length unit
         app.add_plugins((
             PhysicsPlugins::default().with_length_unit(100.0),
-            PhysicsDebugPlugin::default(), // Optional: for debugging physics
+            // PhysicsDebugPlugin::default(), // Optional: for debugging physics
         )); // 100 pixels = 1 meter
 
         // Configure gravity
