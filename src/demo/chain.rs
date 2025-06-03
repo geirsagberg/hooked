@@ -20,7 +20,7 @@ pub(super) fn plugin(app: &mut App) {
 
     app.add_systems(
         Update,
-        (handle_chain_input)
+        handle_chain_input
             .in_set(AppSystems::Update)
             .in_set(PausableSystems)
             .run_if(in_state(Screen::Gameplay)),
@@ -39,11 +39,17 @@ pub struct ChainLink {
 #[reflect(Component)]
 pub struct ChainRoot;
 
-/// Resource to track if a chain is currently active
+/// Resource to track active chains
 #[derive(Resource, Default)]
 pub struct ChainState {
-    pub active: bool,
+    pub chains: Vec<Chain>,
+}
+
+/// Represents a single chain with its links
+#[derive(Debug)]
+pub struct Chain {
     pub links: Vec<Entity>,
+    pub joints: Vec<Entity>,
 }
 
 fn handle_chain_input(
@@ -54,17 +60,8 @@ fn handle_chain_input(
     windows: Query<&Window, With<PrimaryWindow>>,
     camera_query: Query<(&Camera, &GlobalTransform)>,
 ) {
+    // Left click: Add new chain
     if mouse_input.just_pressed(MouseButton::Left) {
-        // Remove existing chain if one exists
-        if chain_state.active {
-            for entity in &chain_state.links {
-                commands.entity(*entity).despawn();
-            }
-            chain_state.links.clear();
-            chain_state.active = false;
-        }
-
-        // Always create new chain
         if let Ok(player_transform) = player_query.single() {
             if let Some(cursor_world_pos) = get_cursor_world_position(&windows, &camera_query) {
                 spawn_chain(
@@ -74,6 +71,21 @@ fn handle_chain_input(
                     cursor_world_pos,
                 );
             }
+        }
+    }
+
+    // Right click: Remove oldest chain
+    if mouse_input.just_pressed(MouseButton::Right) {
+        if let Some(oldest_chain) = chain_state.chains.first() {
+            // Despawn all entities in the oldest chain
+            for &entity in &oldest_chain.links {
+                commands.entity(entity).despawn();
+            }
+            for &entity in &oldest_chain.joints {
+                commands.entity(entity).despawn();
+            }
+            // Remove from the list
+            chain_state.chains.remove(0);
         }
     }
 }
@@ -106,7 +118,11 @@ fn spawn_chain(
     let num_links = (chain_length / actual_link_spacing).max(1.0) as usize;
 
     let mut previous_entity = None;
-    chain_state.links.clear();
+    let mut new_chain = Chain {
+        links: Vec::new(),
+        joints: Vec::new(),
+    };
+
     for i in 0..num_links {
         let link_progress = i as f32 / num_links.max(1) as f32;
         let link_pos = start_pos
@@ -127,7 +143,7 @@ fn spawn_chain(
             SweptCcd::default(),   // Continuous Collision Detection to prevent tunneling
             Restitution::new(0.1), // Less bounciness for smoother collisions
             Friction::new(0.7),    // Higher friction for better interaction with obstacles
-            // Collision groups to ensure proper detection
+            // Collision groups to ensure proper detection (including self-collision)
             CollisionLayers::new(
                 [Layer::ChainLink],
                 [Layer::ChainLink, Layer::StaticObstacle],
@@ -148,23 +164,27 @@ fn spawn_chain(
         }
 
         let current_entity = entity_commands.id();
-        chain_state.links.push(current_entity); // Create joint to previous link or player
+        new_chain.links.push(current_entity);
+
+        // Create joint to previous link
         if let Some(prev_entity) = previous_entity {
-            commands.spawn((
+            let joint_entity = commands.spawn((
                 Name::new(format!("Chain Joint {}-{}", i - 1, i)),
                 RevoluteJoint::new(prev_entity, current_entity)
                     .with_local_anchor_1(Vec2::new(capsule_half_length, 0.0)) // Right end of previous link
                     .with_local_anchor_2(Vec2::new(-capsule_half_length, 0.0)) // Left end of current link
                     .with_compliance(0.00001) // Soft constraint for natural movement
                     .with_angular_velocity_damping(0.1), // Add some rotational damping
-            ));
+            )).id();
+            
+            new_chain.joints.push(joint_entity);
         }
 
         previous_entity = Some(current_entity);
     }
 
     // Give the chain an initial impulse towards the target
-    if let Some(&first_link) = chain_state.links.first() {
+    if let Some(&first_link) = new_chain.links.first() {
         let impulse_strength = 200.0; // Reduced impulse strength for better collision handling
         let impulse = chain_direction * impulse_strength;
 
@@ -173,5 +193,6 @@ fn spawn_chain(
             .insert(ExternalImpulse::new(impulse));
     }
 
-    chain_state.active = true;
+    // Add the new chain to our collection
+    chain_state.chains.push(new_chain);
 }
